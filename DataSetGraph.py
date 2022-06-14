@@ -5,8 +5,12 @@ from torch_geometric.data import Dataset
 from torch_geometric.data import Data
 import torch
 
-
 def ReadPolyData(filename):
+    '''
+    Helper function to read in any polydata
+    filename: (str) path to file
+    returns: data loaded as vtk polydata
+    '''
     reader = vtk.vtkXMLPolyDataReader()
     reader.SetFileName(filename)
     reader.Update()
@@ -35,8 +39,6 @@ class PhotoLandmarkDatasetGraph(Dataset):
         return len(self.photos)
     
     def __getitem__(self, idx):
-    #torch geometric uses the "get" method instead of "getitem"
-    # def get(self, idx):
 
         image_vtp = ReadPolyData(self.photos[idx])
 
@@ -45,10 +47,6 @@ class PhotoLandmarkDatasetGraph(Dataset):
         landmarks_vtp = ReadPolyData(self.landmarks[idx])
         landmarks = vtk_to_numpy(landmarks_vtp.GetPoints().GetData())
 
-        # image_vtp = self.smooth_mesh(image_vtp)
-        # if self.transform:
-        #     image = self.transform(image)
-        #     landmarks = self.transform(landmarks)
         data = convert_to_graph(image_vtp, landmarks)
         if self.normalize:
             data = normalize_data(data)
@@ -96,19 +94,21 @@ def convert_to_graph(image_vtp, landmarks):
     return data
 
 def calc_node_weights(pos):
+    '''
+    Function to calculate node weights based on their spatial positions
+    returns: weights for each node
+    '''
     dist = torch.cdist(pos, pos)
     average_dist = torch.sum(dist, dim = 0)/(dist.shape[0]-1)
     normalized_dist = (average_dist - average_dist.min())/ (average_dist.max() - average_dist.min())
     return torch.stack([normalized_dist,1-normalized_dist], dim = 1)
 
 def get_edges_of_mesh( mesh):
-    
     '''
     Construct an edge list using COO format
     '''
     edge_table = {}
     for point in range(mesh.GetNumberOfPoints()):
-        # print(f'Extracting edges for point {point} out of {mesh.GetNumberOfPoints()}', end = '\r')
         #for each cell
         cellidlist = vtk.vtkIdList()
         mesh.GetPointCells(point, cellidlist)
@@ -124,7 +124,9 @@ def get_edges_of_mesh( mesh):
     return edge_table
 
 def convert_to_coo(edge_table):
-    # print('Converting format to coo...')
+    '''
+    A helper function to convert the edge table to COO format
+    '''
     in_edges = []
     out_edges = []
     for key, val in edge_table.items():

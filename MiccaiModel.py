@@ -1,3 +1,4 @@
+from ast import Add
 import torch
 import torch_geometric
 import DataSetGraph as DataSet
@@ -11,6 +12,7 @@ def ConvertToVTP(data, landmarks):
     out_landmarks.SetPoints(vtk.vtkPoints())
     for p in range(len(landmarks)):
         out_landmarks.GetPoints().InsertNextPoint(landmarks[p, 0 ], landmarks[p, 1], landmarks[p, 2])
+    out_landmarks = AddArraysToLandmarks(out_landmarks)
     return out_landmarks
     
 def DownsampleMesh(mesh, target_reduction = 0.1):
@@ -82,5 +84,4 @@ def RunInference(surface):
     graph = ConvertSurfaceToGraph(surface)
     landmarks = PlacePatientLandmarksGraph(graph)
     landmarks_vtp = ConvertToVTP(graph, landmarks)
-    landmarks_vtp = AddArraysToLandmarks(landmarks_vtp)
     return landmarks_vtp
