@@ -1,6 +1,5 @@
-from tools.DataSetGraph import ReadPolyData, WritePolyData
-import pdb
 from tools.LandmarkingUtils import RunInference
+from Analyze3DPhotogram import ReadImage
 import time
 from tools.PhotoAnalysisTools import AlignPatientToTemplate, GenerateSphericalMapOfData, ComputeFromSphericalImage
 from Analyze3DPhotogram import ParseArguments
@@ -13,7 +12,7 @@ if __name__ == "__main__":
     sex = args.sex
     #VTK xml reader
     start_time = time.time()
-    image = ReadPolyData(args.input_filename)
+    image = ReadImage(args.input_filename)
     #run the inference
     landmarks = RunInference(image)
     landmark_time = time.time()

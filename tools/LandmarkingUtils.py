@@ -262,7 +262,6 @@ def CutMeshWithCranialBaseLandmarks(mesh, landmarkCoords, extraSpace=0, useTwoLa
         p1 = landmarkCoords[0, :] - 10 * dorsumVect
         p2 = landmarkCoords[3, :]
 
-
         v0 = p2 - p1
         v1 = p2 - p0
         n = np.cross(v0, v1)

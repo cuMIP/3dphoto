@@ -1,7 +1,7 @@
 from tools.DataSetGraph import ReadPolyData, WritePolyData
 import pdb
 from tools.LandmarkingUtils import RunInference
-from Analyze3DPhotogram import ValidVTP
+from Analyze3DPhotogram import ValidVTP, ReadImage
 import argparse
 from os import path
 
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     #define the path to the data
     args = ParseArguments()
     #VTK reader
-    image = ReadPolyData(args.input_filename)
+    image = ReadImage(args.input_filename)
     #run the inference
     landmarks, cropped_image = RunInference(image, crop = args.crop_data, return_cropped_image=True)
     WritePolyData(landmarks,path.join(path.dirname(args.input_filename),'testlandmarks.vtp'))
