@@ -5,7 +5,7 @@ import argparse
 from tools.LandmarkingUtils import RunInference
 from tools.PhotoAnalysisTools import AlignPatientToTemplate, GenerateSphericalMapOfData, ComputeFromSphericalImage
 
-def PlaceLandmarks(data_filename, crop=True, verbose = True, crop_percentage = crop_percentage):
+def PlaceLandmarks(data_filename, crop=True, verbose = True, crop_percentage = 0.4):
     '''
     Inputs:
         data_filename: String pointing to the 3D photogram

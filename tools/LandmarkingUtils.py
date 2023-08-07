@@ -5,7 +5,7 @@ import numpy as np
 import pdb
 import tools.DataSetGraph as DataSet
 import vtk
-from __init__ import CRANIOFACIAL_LANDMARKING_MODEL_PATH
+from __init__ import CRANIOFACIAL_LANDMARKING_MODEL_PATH, CRANIOFACIAL_LANDMARKING_NOTEXTURE_MODEL_PATH
 
 def ConvertToVTP(data, landmarks):
     #unnormalize the result
@@ -37,7 +37,7 @@ def InterpolateTextureToPoints(mesh, new_mesh):
         try:
             textureArray.InsertNextTuple3(*mesh.GetPointData().GetArray('Texture').GetTuple(locator.FindClosestPoint(*new_mesh.GetPoint(point))))
         except:
-            pdb.set_trace()
+            raise ValueError('No texture array found in photo!')
     
     new_mesh.GetPointData().AddArray(textureArray)
     return new_mesh
@@ -71,11 +71,13 @@ def DownsampleMesh(mesh, target_reduction = 0.1, use_texture = True):
 
     return decimated_mesh
 
+def HasTexture(surface):
+    return bool(surface.GetCellData().HasArray('Texture'))
 
-def ConvertSurfaceToGraph(surface, target_points = 20000):
+def ConvertSurfaceToGraph(surface, target_points = 20000, use_texture = True):
     initial_points = surface.GetNumberOfPoints()
-    downsampled_surface = DownsampleMesh(surface, target_reduction = target_points/initial_points)
-    graphdata = DataSet.convert_to_graph(downsampled_surface, None)
+    downsampled_surface = DownsampleMesh(surface, target_reduction = target_points/initial_points, use_texture=use_texture)
+    graphdata = DataSet.convert_to_graph(downsampled_surface, None, use_texture=use_texture)
     return graphdata
 
 def AddArraysToLandmarks(landmarks, landmark_names = None):
@@ -112,8 +114,11 @@ def AddArraysToLandmarks(landmarks, landmark_names = None):
 def DefaultLandmarkNames():
     return ["TRAGION_RIGHT","SELLION","TRAGION_LEFT","EURYON_RIGHT","EURYON_LEFT","FRONTOTEMPORALE_RIGHT","FRONTOTEMPORALE_LEFT","VERTEX","NASION","GLABELLA","OPISTHOCRANION","GNATHION","STOMION","ZYGION_RIGHT","ZYGION_LEFT","GONION_RIGHT","GONION_LEFT","SUBNASALE","ENDOCANTHION_RIGHT","ENDOCANTHION_LEFT","EXOCANTHION_RIGHT","EXOCANTHION_LEFT","ALAR_RIGHT","ALAR_LEFT","NASALE_TIP","SUBLABIALE","UPPER_LIP"]
 
-def PlacePatientLandmarksGraph(data):
-    model = torch.jit.load(CRANIOFACIAL_LANDMARKING_MODEL_PATH)
+def PlacePatientLandmarksGraph(data, use_texture = True):
+    if use_texture:
+        model = torch.jit.load(CRANIOFACIAL_LANDMARKING_MODEL_PATH)
+    else:
+        model= torch.jit.load(CRANIOFACIAL_LANDMARKING_NOTEXTURE_MODEL_PATH)
     model.eval()
     return model(data.pos, data.x, data.batch, data.edge_index)
 
@@ -337,8 +342,9 @@ def RunInference(surface, crop = True, return_cropped_image = False, crop_percen
     else:
         cropped_surface = surface
 
-    graph = ConvertSurfaceToGraph(cropped_surface)
-    landmarks, heat_map = PlacePatientLandmarksGraph(graph)
+    use_texture = HasTexture(cropped_surface)
+    graph = ConvertSurfaceToGraph(cropped_surface, use_texture = use_texture)
+    landmarks, heat_map = PlacePatientLandmarksGraph(graph, use_texture = use_texture)
     landmarks_vtp = ConvertToVTP(graph, landmarks)
     landmarks_vtp = FitLandmarksOnMesh(landmarks_vtp, heat_map, surface, graph)
     landmarks_vtp = AddArraysToLandmarks(landmarks_vtp)

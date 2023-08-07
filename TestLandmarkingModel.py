@@ -1,5 +1,6 @@
-from ChebyModel.DataSetGraph import ReadPolyData, WritePolyData
-from LandmarkingUtils import RunInference
+from tools.DataSetGraph import ReadPolyData, WritePolyData
+import pdb
+from tools.LandmarkingUtils import RunInference
 from Analyze3DPhotogram import ValidVTP
 import argparse
 from os import path
@@ -10,7 +11,8 @@ def ConstructArguments():
     parser.add_argument('--input_filename', metavar = 'input_filename', required = True, type = ValidVTP,
         help='Input data path')
 
-    parser.add_argument('--crop_image',action='store_true', help = 'Option to crop the data to ensure the shoulders are not included in the photogram.')
+    parser.add_argument('--crop_data',action='store_true', help = 'Option to crop the data to ensure the shoulders are not included in the photogram.')
+
     return parser
 
 def ParseArguments():

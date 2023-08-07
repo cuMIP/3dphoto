@@ -2,6 +2,7 @@ import vtk
 import pdb
 import numpy as np
 import SimpleITK as sitk
+from os import path
 from pathlib import Path
 from vtk.util.numpy_support import vtk_to_numpy
 from torch_geometric.data import Dataset
@@ -29,6 +30,72 @@ def WritePolyData(data, filename):
     writer.Update()
     return
 
+def LoadOBJFile(inputFilePath):
+    reader = vtk.vtkOBJReader()
+    reader.SetFileName(inputFilePath)
+    reader.Update()
+    mesh = reader.GetOutput()
+    tcoords = mesh.GetPointData().GetTCoords()
+
+    image_file =inputFilePath.replace('.obj','.bmp') 
+    if not path.isfile(image_file):
+        image_file =inputFilePath.replace('.obj','.jpg') 
+    if not path.isfile(image_file):
+        raise ValueError("Texture file not found!")
+    timage = sitk.ReadImage(image_file)
+
+    textureArray = vtk.vtkUnsignedCharArray()
+    textureArray.SetName('Texture')
+    textureArray.SetNumberOfComponents(3)
+
+    #timage.SetSpacing((1/timage.GetHeight(),1/timage.GetWidth())) 
+    pointarray = np.zeros((2))
+    for point in range(tcoords.GetNumberOfTuples()):
+        tpoint = tcoords.GetTuple(point)
+        pointarray[0] = tpoint[0] * (timage.GetSize()[0]-1)
+        pointarray[1] = (1-tpoint[1]) * (timage.GetSize()[1]-1)
+
+        texture = timage.GetPixel(int(pointarray[0]), int(pointarray[1]))
+        textureArray.InsertNextTuple3(*texture)
+
+    mesh.GetPointData().AddArray(textureArray)
+    mesh.Modified()
+
+    ptc = vtk.vtkPointDataToCellData()
+    ptc.SetInputData(mesh)
+    ptc.Update()
+    mesh = ptc.GetOutput()
+
+    textureArray = vtk.vtkUnsignedCharArray()
+    textureArray.SetName('Texture')
+    textureArray.SetNumberOfComponents(3)
+    for point in range(mesh.GetCellData().GetArray('Texture').GetNumberOfTuples()):
+        textureArray.InsertNextTuple3(*mesh.GetCellData().GetArray('Texture').GetTuple(point))
+
+    # remove the extra arrays!
+    for n in range(mesh.GetCellData().GetNumberOfArrays()):
+        mesh.GetCellData().RemoveArray(0)
+
+    filter = vtk.vtkTriangleFilter()
+    filter.SetInputData(mesh)
+    filter.Update()
+    mesh = filter.GetOutput()
+
+    filter = vtk.vtkCleanPolyData()
+    filter.SetInputData(mesh)
+    filter.Update()
+    mesh = filter.GetOutput()
+
+    #recompute the normals, add the texture array
+    filter = vtk.vtkPolyDataNormals()
+    filter.SetInputData(mesh)
+    filter.ComputePointNormalsOn()
+    filter.AutoOrientNormalsOn()
+    filter.Update()
+    mesh = filter.GetOutput()
+    mesh.GetCellData().AddArray(textureArray)
+    mesh.Modified()
+    return mesh
 
 class PhotoLandmarkDatasetGraph(Dataset):
 
