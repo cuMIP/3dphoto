@@ -111,6 +111,28 @@ def AddArraysToLandmarks(landmarks, landmark_names = None):
     landmarks.GetPointData().AddArray(nameArray)
     return landmarks
 
+def GetLandmarkNames(landmarks):
+    arr = landmarks.GetPointData().GetAbstractArray('LandmarkName')
+    return np.array([arr.GetValue(x) for x in range(arr.GetNumberOfValues())])
+
+def SelectLandmarks(landmarks, selection):
+    l = vtk.vtkPolyData()
+    l.DeepCopy(landmarks)
+    landmarks = l
+
+    landmark_names = GetLandmarkNames(landmarks)
+    if not np.all(np.isin(selection, landmark_names)):
+        raise ValueError('Incorrect landmark selection! Please check input.')
+
+    ids = [int(np.where(landmark_names == x)[0]) for x in selection]
+    out_landmarks = vtk.vtkPolyData()
+    out_landmarks.SetPoints(vtk.vtkPoints())
+    for id in ids:
+        out_landmarks.GetPoints().InsertNextPoint(landmarks.GetPoints().GetPoint(id))
+    #now add the landmark name array and color
+    out_landmarks = AddArraysToLandmarks(out_landmarks, landmark_names=selection)
+    return out_landmarks
+
 def DefaultLandmarkNames():
     return ["TRAGION_RIGHT","SELLION","TRAGION_LEFT","EURYON_RIGHT","EURYON_LEFT","FRONTOTEMPORALE_RIGHT","FRONTOTEMPORALE_LEFT","VERTEX","NASION","GLABELLA","OPISTHOCRANION","GNATHION","STOMION","ZYGION_RIGHT","ZYGION_LEFT","GONION_RIGHT","GONION_LEFT","SUBNASALE","ENDOCANTHION_RIGHT","ENDOCANTHION_LEFT","EXOCANTHION_RIGHT","EXOCANTHION_LEFT","ALAR_RIGHT","ALAR_LEFT","NASALE_TIP","SUBLABIALE","UPPER_LIP"]
 
@@ -287,6 +309,76 @@ def CutMeshWithCranialBaseLandmarks(mesh, landmarkCoords, extraSpace=0, useTwoLa
     cutter.Update()
 
     return cutter.GetOutput()
+
+def ComputeVolume(image, projected = False):
+
+    filter = vtk.vtkCleanPolyData()
+    filter.SetInputData(image)
+    filter.Update()
+    image = filter.GetOutput()
+    image = WrapSphere(image)
+
+    filter = vtk.vtkPolyDataNormals()
+    filter.SetInputData(image)
+    filter.ComputeCellNormalsOn()
+    filter.ComputePointNormalsOn()
+    filter.NonManifoldTraversalOn()
+    filter.AutoOrientNormalsOn()
+    filter.ConsistencyOn()
+    filter.Update()
+    image = filter.GetOutput()
+
+    filter = vtk.vtkTriangleFilter()
+    filter.PassLinesOff()
+    filter.PassVertsOff()
+    filter.SetInputData(image)
+    filter.Update()
+    image = filter.GetOutput()
+
+    mass = vtk.vtkMassProperties()
+    mass.SetInputData(image)
+    if projected:
+        vol = mass.GetVolumeProjected() / 1e3
+    else:
+        vol = mass.GetVolume() / 1e3
+    return vol
+
+def WrapSphere(inputMesh):
+    # Warping a sphere to the outer surface
+    center = np.zeros([3], dtype=np.float64)
+    for p in range(inputMesh.GetNumberOfPoints()):
+        center += np.array(inputMesh.GetPoint(p))
+    center /= inputMesh.GetNumberOfPoints()
+
+    sphere = vtk.vtkSphereSource()
+    sphere.SetRadius(350)
+    sphere.SetPhiResolution(60)
+    sphere.SetThetaResolution(60)
+    sphere.SetCenter(center)
+    sphere.Update()
+    sphere = sphere.GetOutput()
+
+    wrappedSphere = vtk.vtkSmoothPolyDataFilter()
+    wrappedSphere.SetInputData(0, sphere)
+    wrappedSphere.SetInputData(1, inputMesh)
+    wrappedSphere.Update()
+    wrappedSphere = wrappedSphere.GetOutput()
+
+    # Subdividing
+    filter = vtk.vtkButterflySubdivisionFilter()
+    filter.SetInputData(wrappedSphere)
+    filter.SetNumberOfSubdivisions(2)
+    filter.Update()
+    wrappedSphere = filter.GetOutput()
+
+    # Moving points to the bone so adjustment to the shape is perfect
+    for p in range(wrappedSphere.GetNumberOfPoints()):
+        coords = wrappedSphere.GetPoint(p)
+        closestId = inputMesh.FindPoint(coords[0], coords[1], coords[2])
+        coords = np.array(inputMesh.GetPoint(closestId))
+        wrappedSphere.GetPoints().SetPoint(p, coords[0], coords[1], coords[2])
+    inputMesh = wrappedSphere
+    return inputMesh
 
 def vtkPolyDataToNumpy(polydata,arrayName =  None):
     if not arrayName:

@@ -58,6 +58,9 @@ def ConstructArguments():
     parser.add_argument('--input_filename', metavar = 'input_filename', required = True, type = ValidVTP,
         help='Input data path')
 
+    parser.add_argument('--input_landmarks', metavar = 'input_landmarks', required = False, type = ValidVTP,default = None,
+        help='Input data path')
+
     parser.add_argument('--age', required = True, type = float, metavar = 'age',
         help='Age of the patient in days.')
 
@@ -71,16 +74,26 @@ def ConstructArguments():
                         help = 'Percentage of the image to crop out. Adjust this parameter between 0-1 to control cropping amount.')
     return parser
 
-def ParseArguments():
+def ParseArguments(argv=None):
     parser = ConstructArguments()
-    return parser.parse_args()
+    if argv is None:
+        return parser.parse_args()
+    else:
+        return parser.parse_args(argv)
+
 
 if __name__ == "__main__":
     #parse the arguments, python automatically takes the system args
     args = ParseArguments()
     #first, let's start with the landmarks
     image = ReadImage(args.input_filename)
-    landmarks, image = PlaceLandmarks(image, crop=args.crop_image, verbose=args.verbose, crop_percentage = args.crop_percentage)
+    if args.input_landmarks is None:
+        landmarks, image = PlaceLandmarks(image, crop=args.crop_image, verbose=args.verbose, crop_percentage = args.crop_percentage)
+    elif path.isfile(args.input_landmarks):
+        landmarks = ReadPolyData(args.input_landmarks)
+    else:
+        raise ValueError('Invalid landmark filename!')
+    pdb.set_trace()
     #now the metrics!
     riskScore, HSA_index = ComputeHSAandRiskScore(image, landmarks, args.age, args.sex, verbose=args.verbose)
     print(f'Results calculated from the image: {args.input_filename}\n\tCraniosynostosis Risk Score: {riskScore:0.2f}%\n\tHead Shape Anomaly Index: {HSA_index:0.2f}')
