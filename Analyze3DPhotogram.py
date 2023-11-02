@@ -93,7 +93,6 @@ if __name__ == "__main__":
         landmarks = ReadPolyData(args.input_landmarks)
     else:
         raise ValueError('Invalid landmark filename!')
-    pdb.set_trace()
     #now the metrics!
     riskScore, HSA_index = ComputeHSAandRiskScore(image, landmarks, args.age, args.sex, verbose=args.verbose)
     print(f'Results calculated from the image: {args.input_filename}\n\tCraniosynostosis Risk Score: {riskScore:0.2f}%\n\tHead Shape Anomaly Index: {HSA_index:0.2f}')

@@ -654,7 +654,7 @@ def CreateMeshFromBinaryImage(binaryImage, insidePixelValue=1):
 
     return mesh
 
-def AlignPatientToTemplate(surface, landmarks, select_landmarks= None):
+def AlignPatientToTemplate(surface, landmarks):
 
     l = vtk.vtkPolyData()
     l.DeepCopy(landmarks)
@@ -671,15 +671,14 @@ def AlignPatientToTemplate(surface, landmarks, select_landmarks= None):
     
 
     # select some landmarks? 
-    if type(select_landmarks)==list:
-        selected_templateLandmarks_forRegisitration= SelectLandmarks(templateLandmarks_forRegisitration, landmarks_we_want)
-        landmarks_forregistration = SelectLandmarks(landmarks, landmarks_we_want)
-    else:
-        selected_templateLandmarks_forRegisitration= templateLandmarks_forRegisitration
-        landmarks_forregistration = landmarks
+    landmarks_we_want = ["SELLION","SUBNASALE","TRAGION_RIGHT","TRAGION_LEFT",
+                     "ENDOCANTHION_RIGHT","ENDOCANTHION_LEFT",
+                     "VERTEX", 'OPISTHOCRANION']
+    selected_templateLandmarks_forRegisitration= SelectLandmarks(templateLandmarks_forRegisitration, landmarks_we_want)
+    landmarks_forregistration = SelectLandmarks(landmarks, landmarks_we_want)
 
-    transform = RegisterPatientToTemplate(landmarks_forregistration, selected_templateLandmarks_forRegisitration)
-    transform = sitk.CompositeTransform([transform])
+    alignment_transform = RegisterPatientToTemplate(landmarks_forregistration, selected_templateLandmarks_forRegisitration)
+    transform = sitk.CompositeTransform([alignment_transform])
 
     #we may need a quick ICP to match the centers
     template_space_photo = ApplyTransform(surface, transform)
@@ -703,16 +702,7 @@ def AlignPatientToTemplate(surface, landmarks, select_landmarks= None):
 
     #### NOW MAKE A GOOD EXTERNAL HEAD SURFACE ####
     #make it a binary image
-    template_space_photo = meshToVolume(template_space_photo)
-    headMaskImage = ConvertSitkImage(vtkToSitkImage(template_space_photo), sitk_type= sitk.sitkUInt8)
-
-    #smooth with a median image filter
-    medianFilter = sitk.BinaryMedianImageFilter()
-    medianFilter.SetRadius(6)
-    headMaskImage = medianFilter.Execute(headMaskImage)
-
-    template_space_mesh = CreateMeshFromBinaryImage(headMaskImage, insidePixelValue=1)
-    template_space_mesh = CreateContinuousModelOfExternalCranialSurface(template_space_mesh, template_space_landmarks, cutMesh=False, maskResult=False)
+    template_space_mesh = CreateContinuousModelOfExternalCranialSurface(template_space_photo, template_space_landmarks, cutMesh=False, maskResult=False)
 
     #smooth it!
     template_space_mesh = SmoothMesh(template_space_mesh)
@@ -736,6 +726,7 @@ def AlignPatientToTemplate(surface, landmarks, select_landmarks= None):
     template_space_mesh = ApplyTransform(template_space_mesh, scaling_transform)
     template_space_patient_landmarks = ApplyTransform(template_space_patient_landmarks, scaling_transform)
 
+    transform = sitk.CompositeTransform([scaling_transform, centering_transform, alignment_transform])
     transform.FlattenTransform() # this allows us to save it out
 
     #### TRANSFORM IS DONE, MOVE IT BACK INTO PATIENT SPACE ####
